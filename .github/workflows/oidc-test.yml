@@ -16,5 +16,6 @@ jobs:
           echo "$TOKEN" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq '{iss, sub, aud, repository, workflow}'
 
           echo "=== exchange attempt ==="
-          curl -si "https://octo-sts.mongodb.com/sts/exchange?scope=mongodb/mongodb&identity=probe" \
+          curl -si "https://octo-sts.mongodb.com/sts/exchange?scope=10gen&identity=probe" \
             -H "Authorization: Bearer $TOKEN"
+
