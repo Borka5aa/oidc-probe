@@ -1,0 +1,7 @@
+#!/bin/bash
+echo "--- [ORIGINAL] pre-command hook executing"
+echo "HOOK_SOURCE=main_branch"
+echo "This hook simulates Vault secret loading"
+echo "Loading VAULT_ADDR_SECRET from kv/ci-shared/release/dra-role..."
+export SIMULATED_VAULT_SECRET="original-secret-value-from-vault"
+echo "Secrets loaded successfully"
